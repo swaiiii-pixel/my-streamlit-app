@@ -1,116 +1,77 @@
 import streamlit as st
 from collections import Counter
 import re
-import pandas as pd
-import json
-from lxml import etree
-
-# File handling
-import PyPDF2
-from docx import Document
-import pytesseract
-from PIL import Image
+import plotly.express as px
 
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="Resume Skill Extractor", layout="centered")
 
-# ------------------ STYLE ------------------
+# ------------------ BEIGE BACKGROUND STYLE ------------------
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
     background: linear-gradient(135deg, #f5f5dc, #e8d8c3, #d6c1a3);
     color: #333;
 }
-h1 { text-align: center; color: #8B7355; font-size: 50px; }
+
+h1 {
+    text-align: center;
+    color: #8B7355;
+    font-size: 45px;
+}
+
+h2, h3 {
+    color: #A67B5B;
+}
+
+textarea {
+    background-color: #fffaf0 !important;
+    color: #333 !important;
+    border-radius: 10px !important;
+}
+
+button {
+    background-color: #d2b48c !important;
+    color: black !important;
+    border-radius: 12px !important;
+    font-size: 18px !important;
+    font-weight: bold;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------ TITLE ------------------
 st.title("📄 Resume Skill Extractor")
+st.write("Analyze your resume and match it with job requirements.")
 
-# ------------------ FILE UPLOAD ------------------
-uploaded_file = st.file_uploader("📂 Upload Resume (PDF, DOCX, Image)", 
-                                type=["pdf", "docx", "png", "jpg", "jpeg"])
+# ------------------ INPUT ------------------
+st.subheader("📥 Input Section")
 
+resume_text = st.text_area("📄 Paste Resume Text Here")
 job_desc = st.text_area("💼 Paste Job Description Here")
 
-# ------------------ TEXT EXTRACTION FUNCTIONS ------------------
-
-def extract_text_from_pdf(file):
-    reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-    return text
-
-def extract_text_from_docx(file):
-    doc = Document(file)
-    return "\n".join([para.text for para in doc.paragraphs])
-
-def extract_text_from_image(file):
-    image = Image.open(file)
-    return pytesseract.image_to_string(image)
-
-# ------------------ CONVERT TO JSON ------------------
-def text_to_json(text):
-    return json.dumps({"resume_text": text}, indent=4)
-
-# ------------------ CONVERT TO XML ------------------
-def text_to_xml(text):
-    root = etree.Element("resume")
-    content = etree.SubElement(root, "text")
-    content.text = text
-    return etree.tostring(root, pretty_print=True).decode()
-
-# ------------------ SKILLS ------------------
+# ------------------ SKILLS LIST ------------------
 skills_list = [
     "python", "java", "c", "c++", "html", "css", "javascript",
     "sql", "machine learning", "data analysis", "excel",
     "communication", "teamwork", "leadership"
 ]
 
-# ------------------ PROCESS FILE ------------------
-resume_text = ""
-
-if uploaded_file:
-    file_type = uploaded_file.type
-
-    if "pdf" in file_type:
-        resume_text = extract_text_from_pdf(uploaded_file)
-
-    elif "word" in file_type or "docx" in file_type:
-        resume_text = extract_text_from_docx(uploaded_file)
-
-    elif "image" in file_type:
-        resume_text = extract_text_from_image(uploaded_file)
-
-    st.success("✅ File processed successfully!")
-
-    # Show extracted text (optional)
-    with st.expander("📄 Extracted Text"):
-        st.write(resume_text)
-
-    # JSON + XML
-    st.subheader("🔄 Converted Formats")
-
-    json_data = text_to_json(resume_text)
-    xml_data = text_to_xml(resume_text)
-
-    st.download_button("⬇ Download JSON", json_data, "resume.json")
-    st.download_button("⬇ Download XML", xml_data, "resume.xml")
-
-# ------------------ ANALYSIS ------------------
-if st.button("🔍 Analyze Resume") and resume_text and job_desc:
+# ------------------ BUTTON ------------------
+if st.button("🔍 Analyze Resume"):
 
     resume = resume_text.lower()
     job = job_desc.lower()
 
+    # Extract skills
     resume_skills = [s for s in skills_list if s in resume]
     job_skills = [s for s in skills_list if s in job]
 
+    # Compare
     matched = list(set(resume_skills) & set(job_skills))
     missing = list(set(job_skills) - set(resume_skills))
 
+    # Score
     score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
 
     # ------------------ RESULTS ------------------
@@ -127,24 +88,67 @@ if st.button("🔍 Analyze Resume") and resume_text and job_desc:
     st.write(f"{score}% match")
 
     # ------------------ BAR CHART ------------------
-    chart_data = pd.DataFrame({
-        "Matched": [len(matched)],
-        "Missing": [len(missing)]
-    })
-    st.bar_chart(chart_data)
+    bar_data = {
+        "Skills": ["Matched", "Missing"],
+        "Count": [len(matched), len(missing)]
+    }
+
+    fig_bar = px.bar(
+        bar_data,
+        x="Skills",
+        y="Count",
+        color="Skills",
+        color_discrete_map={
+            "Matched": "#c2a383",
+            "Missing": "#8b5e3c"
+        },
+        title="Skill Comparison"
+    )
+
+    st.plotly_chart(fig_bar)
+
+    # ------------------ PIE CHART ------------------
+    pie_data = {
+        "Skill": ["Matched", "Missing"],
+        "Count": [len(matched), len(missing)]
+    }
+
+    fig_pie = px.pie(
+        pie_data,
+        names="Skill",
+        values="Count",
+        color="Skill",
+        color_discrete_map={
+            "Matched": "#c2a383",
+            "Missing": "#8b5e3c"
+        },
+        title="Matched vs Missing Skills"
+    )
+
+    st.plotly_chart(fig_pie)
 
     # ------------------ WORD FREQUENCY ------------------
+    st.subheader("📈 Resume Word Frequency")
+
     words = re.findall(r'\w+', resume)
     common_words = Counter(words).most_common(5)
 
     if common_words:
         w, c = zip(*common_words)
 
-        df = pd.DataFrame({
-            "Words": w,
+        word_data = {
+            "Word": w,
             "Count": c
-        }).set_index("Words")
+        }
 
-        st.bar_chart(df)
+        fig_words = px.bar(
+            word_data,
+            x="Word",
+            y="Count",
+            color="Word",
+            title="Top Words in Resume"
+        )
+
+        st.plotly_chart(fig_words)
 
     st.success("✅ Analysis Complete!")
