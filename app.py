@@ -1,6 +1,4 @@
 import streamlit as st
-from collections import Counter
-import re
 import plotly.express as px
 import pandas as pd
 
@@ -14,30 +12,6 @@ st.markdown("""
     background: linear-gradient(135deg, #f5f5dc, #e8d8c3, #d6c1a3);
     color: #333;
 }
-
-h1 {
-    text-align: center;
-    color: #8B7355;
-    font-size: 50px;
-}
-
-h2, h3 {
-    color: #A67B5B;
-}
-
-textarea {
-    background-color: #fffaf0 !important;
-    color: #333 !important;
-    border-radius: 10px !important;
-}
-
-button {
-    background-color: #d2b48c !important;
-    color: black !important;
-    border-radius: 12px !important;
-    font-size: 18px !important;
-    font-weight: bold;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,8 +20,6 @@ st.title("📄 Resume Skill Extractor")
 st.write("Analyze your resume and match it with job requirements.")
 
 # ------------------ INPUT ------------------
-st.subheader("📥 Input Section")
-
 resume_text = st.text_area("📄 Paste Resume Text Here")
 job_desc = st.text_area("💼 Paste Job Description Here")
 
@@ -60,6 +32,10 @@ skills_list = [
 
 # ------------------ BUTTON ------------------
 if st.button("🔍 Analyze Resume"):
+
+    if not resume_text or not job_desc:
+        st.warning("⚠️ Please fill both fields")
+        st.stop()
 
     resume = resume_text.lower()
     job = job_desc.lower()
@@ -75,56 +51,19 @@ if st.button("🔍 Analyze Resume"):
     # ------------------ RESULTS ------------------
     st.header("📊 Results")
 
-    st.subheader("✅ Matched Skills")
-    st.write(matched if matched else "No matches found")
+    st.write("✅ Matched Skills:", matched)
+    st.write("❌ Missing Skills:", missing)
+    st.write(f"📈 Match Score: {score}%")
 
-    st.subheader("❌ Missing Skills")
-    st.write(missing if missing else "No missing skills")
-
-    st.subheader("📈 Match Score")
     st.progress(score / 100)
-    st.write(f"{score}% match")
 
     # ------------------ PIE CHART ------------------
-    st.subheader("🥧 Skill Distribution")
-
-    pie_data = pd.DataFrame({
-        "Category": ["Matched", "Missing"],
+    df = pd.DataFrame({
+        "Type": ["Matched", "Missing"],
         "Count": [len(matched), len(missing)]
     })
 
-    fig_pie = px.pie(
-        pie_data,
-        names="Category",
-        values="Count",
-        title="Matched vs Missing Skills",
-        color="Category",
-        color_discrete_map={
-            "Matched": "#c2a383",
-            "Missing": "#8b5e3c"
-        }
-    )
+    fig = px.pie(df, names="Type", values="Count", hole=0.4)
+    st.plotly_chart(fig)
 
-    # ✨ Animation + styling
-    fig_pie.update_traces(
-        textinfo='percent+label',
-        pull=[0.1, 0]
-    )
-
-    fig_pie.update_layout(
-        transition_duration=800
-    )
-
-    st.plotly_chart(fig_pie)
-
-    # ------------------ WORD FREQUENCY ------------------
-    st.subheader("📈 Resume Word Frequency")
-
-    words = re.findall(r'\w+', resume)
-    common_words = Counter(words).most_common(5)
-
-    if common_words:
-        word_dict = dict(common_words)
-        st.bar_chart(word_dict)
-
-    st.success("✅ Analysis Complete!")
+    st.success("✅ Done!")
