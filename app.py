@@ -1,6 +1,8 @@
 import streamlit as st
 from collections import Counter
 import re
+import pandas as pd
+import plotly.express as px
 
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="Resume Skill Extractor", layout="centered")
@@ -87,23 +89,22 @@ if st.button("🔍 Analyze Resume"):
     st.progress(score / 100)
     st.write(f"{score}% match")
 
-    # ------------------ BAR CHART ------------------
-    fig, ax = plt.subplots()
-    ax.bar(["Matched", "Missing"], [len(matched), len(missing)])
-    ax.set_title("Skill Comparison")
-    st.pyplot(fig)
-
     # ------------------ PIE CHART ------------------
-    fig2, ax2 = plt.subplots()
-    ax2.pie(
-        [len(matched), len(missing)],
-        labels=["Matched", "Missing"],
-        autopct='%1.1f%%',
-        startangle=90,
-        colors=["#c2a383", "#8b5e3c"]
+    pie_data = {
+        "Skill": ["Matched", "Missing"],
+        "Count": [len(matched), len(missing)]
+    }
+
+    fig_pie = px.pie(
+        pie_data,
+        names="Skill",
+        values="Count",
+        color="Skill",
+        color_discrete_map={"Matched": "#c2a383", "Missing": "#8b5e3c"},
+        title="Matched vs Missing Skills"
     )
-    ax2.axis('equal')
-    st.pyplot(fig2)
+
+    st.plotly_chart(fig_pie)
 
     # ------------------ WORD FREQUENCY ------------------
     st.subheader("📈 Resume Word Frequency")
@@ -113,9 +114,12 @@ if st.button("🔍 Analyze Resume"):
 
     if common_words:
         w, c = zip(*common_words)
-        fig3, ax3 = plt.subplots()
-        ax3.bar(w, c)
-        ax3.set_title("Top Words in Resume")
-        st.pyplot(fig3)
+
+        df = pd.DataFrame({
+            "Words": w,
+            "Count": c
+        }).set_index("Words")
+
+        st.bar_chart(df)
 
     st.success("✅ Analysis Complete!")
